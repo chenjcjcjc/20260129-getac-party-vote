@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[即時戰況]2025尾牙 極速變身- Dress Code Dressing Up Show</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* 全局設定：深藍色背景，配合你的活動主視覺 */
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); /* 深藍漸層 */
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: rgba(255, 255, 255, 0.05); /* 半透明玻璃質感 */
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        h1 {
+            text-align: center;
+            color: #FFD700; /* 金黃色標題 */
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            margin-bottom: 5px;
+            font-size: 1.8rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #a8dce7;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+
+        /* 狀態燈號 */
+        .status-bar {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            background-color: rgba(0, 255, 127, 0.2);
+            color: #00ff7f;
+            border: 1px solid #00ff7f;
+        }
+
+        /* 圖表容器 RWD 設定 */
+        .chart-container {
+            position: relative;
+            height: 60vh; /* 手機上佔 60% 高度 */
+            width: 100%;
+        }
+
+        /* 頁尾 */
+        .footer {
+            margin-top: 20px;
+            font-size: 0.8rem;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🏆 現場人氣投票戰況</h1>
+        <div class="subtitle">數據每 1 分鐘自動更新</div>
+
+        <div class="status-bar">
+            <span id="connectionStatus" class="status-badge">連線中...</span>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="voteChart"></canvas>
+        </div>
+    </div>
+
+    <div class="footer">Powered by IT Dept. v202601131754</div>
+
+<script>
+        // =========================================================
+        // ⚠️ Google Apps Script 網址 (請確認已加上 ?op=data)
+        const API_URL = "https://script.google.com/macros/s/AKfycbw_3YTA9SZ-5dQv2t_09Xs-17fXC4ud-hx_lEciUT626MwgJ2qt3M2i04JRA13qycSR/exec?op=data"; 
+        // =========================================================
+
+        let myChart = null;
+        let updateTimer = null; // 用來存計時器，方便我們隨時暫停/啟動
+        let errorCount = 0;     // 計算連續錯誤次數，用來做避讓機制
+
+        // 初始化圖表 (維持不變)
+        function initChart() {
+            const ctx = document.getElementById('voteChart').getContext('2d');
+            let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(54, 162, 235, 1)');
+            gradient.addColorStop(1, 'rgba(54, 162, 235, 0.2)');
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '得票數',
+                        data: [],
+                        backgroundColor: gradient,
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1,
+                        borderRadius: 5,
+                        barPercentage: 0.6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#ffffff', font: { size: 14 }, stepSize: 1, precision: 0 } 
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#ffffff', font: { size: 14, weight: 'bold' } }
+                        }
+                    },
+                    animation: { duration: 1000 }
+                }
+            });
+        }
+
+        // 核心功能：抓取資料
+        async function fetchData() {
+            // 🛑 流量控制 1: 如果頁面被隱藏 (使用者切換分頁或鎖屏)，就不抓資料，直接跳過
+            if (document.hidden) {
+                console.log("頁面隱藏中，暫停更新以節省流量...");
+                return; // 直接結束，等待下次排程
+            }
+
+            const statusBadge = document.getElementById('connectionStatus');
+            
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error("Server busy or error");
+                
+                const jsonData = await response.json();
+
+                // 更新圖表
+                myChart.data.labels = jsonData.map(item => item.team);
+                myChart.data.datasets[0].data = jsonData.map(item => item.votes);
+                myChart.update();
+
+                // 更新成功，重置錯誤計數
+                errorCount = 0;
+                
+                const now = new Date();
+                statusBadge.innerText = "🟢 最後更新: " + now.toLocaleTimeString();
+                statusBadge.style.color = "#00ff7f";
+                statusBadge.style.borderColor = "#00ff7f";
+
+            } catch (error) {
+                console.error("Fetch error:", error);
+                errorCount++; // 錯誤次數 +1
+                
+                statusBadge.innerText = "⚠️ 連線繁忙，稍後重試...";
+                statusBadge.style.color = "#ffeb3b";
+                statusBadge.style.borderColor = "#ffeb3b";
+            } finally {
+                // 不管成功或失敗，都安排下一次更新
+                scheduleNextUpdate();
+            }
+        }
+
+        // 🛑 流量控制 2: 智慧排程系統
+        function scheduleNextUpdate() {
+            // 基礎延遲：30 ~ 35 秒 (隨機)
+            let baseDelay = 30000 + Math.random() * 5000; 
+
+            // 如果連續發生錯誤 (代表伺服器快掛了)，我們就自動把時間拉長
+            // 錯誤 1 次 -> 等 30秒
+            // 錯誤 2 次 -> 等 60秒
+            // 錯誤 3 次 -> 等 90秒 (以此類推，讓伺服器喘息)
+            if (errorCount > 0) {
+                baseDelay = baseDelay * (errorCount + 1); 
+                console.log(`偵測到連線錯誤，下次更新將延後至 ${Math.floor(baseDelay/1000)} 秒後`);
+            }
+
+            // 清除舊的計時器 (避免重複執行)
+            if (updateTimer) clearTimeout(updateTimer);
+            
+            updateTimer = setTimeout(() => {
+                fetchData();
+            }, baseDelay);
+        }
+
+        // 監聽頁面狀態：當使用者切換回來時，立刻抓一次最新的
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) {
+                console.log("使用者回來了，立刻更新數據！");
+                if (updateTimer) clearTimeout(updateTimer); // 取消原本的排程
+                fetchData(); // 立刻執行
+            }
+        });
+
+        // 程式進入點
+        window.onload = function() {
+            initChart();           // 1. 畫出空圖表
+            
+            // ✨ 優化：在 0~3 秒之間隨機延遲後才發出「第一次」請求
+            // 這樣可以避免主持人一喊開始，大家同時按下連結造成瞬間塞車
+            setTimeout(() => {
+                fetchData();
+            }, Math.random() * 3000); 
+        };
+    </script>
+</body>
+</html>
