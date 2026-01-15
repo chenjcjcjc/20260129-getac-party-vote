@@ -51,15 +51,27 @@
         .status-bar {
             text-align: center;
             margin-bottom: 20px;
+            cursor: pointer; /* 讓使用者知道可以點擊喚醒 */
         }
         .status-badge {
             display: inline-block;
-            padding: 5px 15px;
+            padding: 8px 20px; /* 加大一點比較好點 */
             border-radius: 50px;
-            font-size: 0.8rem;
+            font-size: 0.9rem;
             background-color: rgba(0, 255, 127, 0.2);
             color: #00ff7f;
             border: 1px solid #00ff7f;
+            transition: all 0.3s;
+        }
+        .status-badge:hover {
+            transform: scale(1.05);
+        }
+
+        /* 休眠狀態的樣式 (變灰色) */
+        .status-sleep {
+            background-color: rgba(255, 255, 255, 0.1) !important;
+            color: #ccc !important;
+            border-color: #ccc !important;
         }
 
         /* 圖表容器 RWD 設定 */
@@ -84,7 +96,8 @@
         <h1>🏆 現場人氣投票戰況</h1>
         <div class="subtitle">數據每 1 分鐘自動更新</div>
 
-        <div class="status-bar">
+        <!-- 點擊這個狀態列可以手動喚醒 -->
+        <div class="status-bar" onclick="wakeUp()">
             <span id="connectionStatus" class="status-badge">連線中...</span>
         </div>
         
@@ -93,9 +106,9 @@
         </div>
     </div>
 
-    <div class="footer">Powered by IT Dept. v202601131754</div>
+    <div class="footer">Powered by 福委會. v20260115</div>
 
-<script>
+    <script>
         // =========================================================
         // ⚠️ Google Apps Script 網址 (請確認已加上 ?op=data)
         const API_URL = "https://script.google.com/macros/s/AKfycbyHNNHudJ_yLWlF-9JuEWELq_MGRefaN0zdTzQ0gdXi9_dgx8rCl1Hn4E6fEra7dL1d/exec?op=data"; 
@@ -104,12 +117,17 @@
         let myChart = null;
         let updateTimer = null; // 用來存計時器，方便我們隨時暫停/啟動
         let errorCount = 0;     // 計算連續錯誤次數，用來做避讓機制
+        
+        // 🔒 安全機制變數：防止有人掛網吃掉配額
+        let activeTime = 0; 
+        const MAX_ACTIVE_TIME = 180; // 3分鐘 (180秒) 後自動休眠
+        let isSleeping = false;
 
         // 初始化圖表設定 (已加入數值標籤功能)
         function initChart() {
             const ctx = document.getElementById('voteChart').getContext('2d');
             
-            // 設定漸層顏色
+            // 設定漸層顏色 (讓長條圖比較有質感)
             let gradient = ctx.createLinearGradient(0, 0, 0, 400);
             gradient.addColorStop(0, 'rgba(54, 162, 235, 1)');   // 頂部淺藍
             gradient.addColorStop(1, 'rgba(54, 162, 235, 0.2)'); // 底部透明
@@ -138,11 +156,11 @@
                     },
                     plugins: {
                         legend: { display: false }, // 隱藏圖例
-                        tooltip: {
-                            backgroundColor: 'rgba(0,0,0,0.8)',
-                            titleFont: { size: 14 },
-                            bodyFont: { size: 16 }
-                        }
+                        // 自定義數字標籤 (維持你原本要顯示數字的功能)
+                        customLabels: { display: true } 
+													
+												  
+						 
                     },
                     scales: {
                         y: {
@@ -161,7 +179,7 @@
                         }
                     },
                     animation: {
-                        duration: 1000
+                        duration: 0 // ✨ 關鍵：關閉動畫，數據一到瞬間顯示，感覺最快
                     }
                 },
                 // ✨ 新增：自定義插件，用來畫數字
@@ -202,6 +220,12 @@
                 console.log("頁面隱藏中，暫停更新以節省流量...");
                 return; // 直接結束，等待下次排程
             }
+            
+            // 🛑 流量控制 2: 防超時機制 (超過 3 分鐘就停止更新)
+            if (activeTime >= MAX_ACTIVE_TIME) {
+                goSleep();
+                return;
+            }
 
             const statusBadge = document.getElementById('connectionStatus');
             
@@ -221,8 +245,12 @@
                 
                 const now = new Date();
                 statusBadge.innerText = "🟢 最後更新: " + now.toLocaleTimeString();
+                statusBadge.className = "status-badge"; // 恢復綠燈樣式
                 statusBadge.style.color = "#00ff7f";
                 statusBadge.style.borderColor = "#00ff7f";
+
+                // 每次成功更新，累加活躍時間 (大約加 60秒)
+                activeTime += 60; 
 
             } catch (error) {
                 console.error("Fetch error:", error);
@@ -237,15 +265,15 @@
             }
         }
 
-        // 🛑 流量控制 2: 智慧排程系統
+        // 🛑 流量控制 3: 智慧排程系統
         function scheduleNextUpdate() {
-            // 基礎延遲：30 ~ 35 秒 (隨機)
-            let baseDelay = 30000 + Math.random() * 5000; 
+            // 基礎延遲：60秒 ~ 70秒 (大幅降低頻率，節省配額)
+            let baseDelay = 60000 + Math.random() * 10000; 
 
             // 如果連續發生錯誤 (代表伺服器快掛了)，我們就自動把時間拉長
-            // 錯誤 1 次 -> 等 30秒
-            // 錯誤 2 次 -> 等 60秒
-            // 錯誤 3 次 -> 等 90秒 (以此類推，讓伺服器喘息)
+            // 錯誤 1 次 -> 等待時間加倍，讓伺服器喘息
+										
+																			
             if (errorCount > 0) {
                 baseDelay = baseDelay * (errorCount + 1); 
                 console.log(`偵測到連線錯誤，下次更新將延後至 ${Math.floor(baseDelay/1000)} 秒後`);
@@ -259,12 +287,35 @@
             }, baseDelay);
         }
 
-        // 監聽頁面狀態：當使用者切換回來時，立刻抓一次最新的
+        // 進入休眠模式 (停止吃流量)
+        function goSleep() {
+            isSleeping = true;
+            if (updateTimer) clearTimeout(updateTimer);
+            
+            const statusBadge = document.getElementById('connectionStatus');
+            statusBadge.innerText = "💤 已暫停更新 (點擊這裡繼續)";
+            statusBadge.className = "status-badge status-sleep"; // 變灰色
+        }
+
+        // 喚醒功能 (使用者點擊按鈕，或是重新切換回分頁時觸發)
+        function wakeUp() {
+            activeTime = 0; // 重置計時
+            const statusBadge = document.getElementById('connectionStatus');
+            
+            if (isSleeping) {
+                isSleeping = false;
+                statusBadge.innerText = "🔄 重新連線中...";
+                statusBadge.className = "status-badge"; // 恢復亮燈
+                fetchData(); // 立刻抓一次
+            }
+        }
+
+        // 監聽頁面狀態：當使用者切換回來時，自動喚醒並更新
         document.addEventListener("visibilitychange", () => {
             if (!document.hidden) {
-                console.log("使用者回來了，立刻更新數據！");
-                if (updateTimer) clearTimeout(updateTimer); // 取消原本的排程
-                fetchData(); // 立刻執行
+                // 如果之前已經睡著了，或是只是單純切回來，都試著喚醒並更新
+                wakeUp(); 
+											
             }
         });
 
@@ -272,12 +323,12 @@
         window.onload = function() {
             initChart();           // 1. 畫出空圖表
             
-            // ✨ 優化：在 0~3 秒之間隨機延遲後才發出「第一次」請求
+            // ✨ 優化：在 0.5~1.5 秒之間隨機延遲後才發出「第一次」請求
             // 這樣可以避免主持人一喊開始，大家同時按下連結造成瞬間塞車
-            // 修改：把 3000 改成 1500 (最慢只等 1.5秒)
+            // 同時保持「幾乎秒開」的良好體感
             setTimeout(() => {
                 fetchData();
-            }, Math.random() * 1500); 
+            }, 500 + Math.random() * 1000); 
         };
     </script>
 </body>
