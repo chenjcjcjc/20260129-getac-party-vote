@@ -51,27 +51,27 @@
         .status-bar {
             text-align: center;
             margin-bottom: 20px;
-            cursor: pointer; /* 讓使用者知道可以點擊喚醒 */
+            cursor: pointer; /* 讓使用者知道可以點擊更新 */
+            user-select: none; /* 防止點擊時選取文字 */
         }
         .status-badge {
             display: inline-block;
-            padding: 8px 20px; /* 加大一點比較好點 */
+            padding: 10px 25px; /* 加大一點，讓它更像按鈕 */
             border-radius: 50px;
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             background-color: rgba(0, 255, 127, 0.2);
             color: #00ff7f;
             border: 1px solid #00ff7f;
-            transition: all 0.3s;
+            transition: all 0.2s;
+            box-shadow: 0 0 10px rgba(0, 255, 127, 0.1);
         }
         .status-badge:hover {
             transform: scale(1.05);
+            background-color: rgba(0, 255, 127, 0.3);
+            cursor: pointer;
         }
-
-        /* 休眠狀態的樣式 (變灰色) */
-        .status-sleep {
-            background-color: rgba(255, 255, 255, 0.1) !important;
-            color: #ccc !important;
-            border-color: #ccc !important;
+        .status-badge:active {
+            transform: scale(0.95); /* 點擊時縮小效果 */
         }
 
         /* 圖表容器 RWD 設定 */
@@ -94,10 +94,11 @@
 
     <div class="container">
         <h1>🏆 現場人氣投票戰況</h1>
-        <div class="subtitle">數據每 1 分鐘自動更新</div>
+        <!-- 修改說明文字，引導使用者手動更新 -->
+        <div class="subtitle">⬇️ 點擊下方按鈕或重新整理頁面以更新數據 ⬇️</div>
 
-        <!-- 點擊這個狀態列可以手動喚醒 -->
-        <div class="status-bar" onclick="wakeUp()">
+        <!-- 點擊這個狀態列可以手動觸發更新 -->
+        <div class="status-bar" onclick="manualRefresh()">
             <span id="connectionStatus" class="status-badge">連線中...</span>
         </div>
         
@@ -106,7 +107,7 @@
         </div>
     </div>
 
-    <div class="footer">Powered by 福委會. v20260115</div>
+    <div class="footer">Powered by IT Dept. vFinal-Manual</div>
 
     <script>
         // =========================================================
@@ -115,13 +116,7 @@
         // =========================================================
 
         let myChart = null;
-        let updateTimer = null; // 用來存計時器，方便我們隨時暫停/啟動
-        let errorCount = 0;     // 計算連續錯誤次數，用來做避讓機制
-        
-        // 🔒 安全機制變數：防止有人掛網吃掉配額
-        let activeTime = 0; 
-        const MAX_ACTIVE_TIME = 180; // 3分鐘 (180秒) 後自動休眠
-        let isSleeping = false;
+        let isFetching = false; // 防止使用者瘋狂連點
 
         // 初始化圖表設定 (已加入數值標籤功能)
         function initChart() {
@@ -158,9 +153,6 @@
                         legend: { display: false }, // 隱藏圖例
                         // 自定義數字標籤 (維持你原本要顯示數字的功能)
                         customLabels: { display: true } 
-													
-												  
-						 
                     },
                     scales: {
                         y: {
@@ -213,21 +205,18 @@
             });
         }
 
-        // 核心功能：抓取資料
+        // 核心功能：抓取資料 (單次執行)
         async function fetchData() {
-            // 🛑 流量控制 1: 如果頁面被隱藏 (使用者切換分頁或鎖屏)，就不抓資料，直接跳過
-            if (document.hidden) {
-                console.log("頁面隱藏中，暫停更新以節省流量...");
-                return; // 直接結束，等待下次排程
-            }
-            
-            // 🛑 流量控制 2: 防超時機制 (超過 3 分鐘就停止更新)
-            if (activeTime >= MAX_ACTIVE_TIME) {
-                goSleep();
-                return;
-            }
+            // 防止重複點擊：如果正在抓資料，就不要再執行
+            if (isFetching) return;
+            isFetching = true;
 
             const statusBadge = document.getElementById('connectionStatus');
+            
+            // 點擊後立刻顯示載入中
+            statusBadge.innerText = "🔄 更新中...";
+            statusBadge.style.color = "#a8dce7";
+            statusBadge.style.borderColor = "#a8dce7";
             
             try {
                 const response = await fetch(API_URL);
@@ -240,82 +229,33 @@
                 myChart.data.datasets[0].data = jsonData.map(item => item.votes);
                 myChart.update();
 
-                // 更新成功，重置錯誤計數
-                errorCount = 0;
-                
                 const now = new Date();
-                statusBadge.innerText = "🟢 最後更新: " + now.toLocaleTimeString();
-                statusBadge.className = "status-badge"; // 恢復綠燈樣式
+                statusBadge.innerText = "🟢 點此更新 (最後更新時間: " + now.toLocaleTimeString() + ")";
                 statusBadge.style.color = "#00ff7f";
                 statusBadge.style.borderColor = "#00ff7f";
 
-                // 每次成功更新，累加活躍時間 (大約加 60秒)
-                activeTime += 60; 
-
             } catch (error) {
                 console.error("Fetch error:", error);
-                errorCount++; // 錯誤次數 +1
                 
-                statusBadge.innerText = "⚠️ 連線繁忙，稍後重試...";
+                statusBadge.innerText = "⚠️ 更新失敗，點此重試";
                 statusBadge.style.color = "#ffeb3b";
                 statusBadge.style.borderColor = "#ffeb3b";
             } finally {
-                // 不管成功或失敗，都安排下一次更新
-                scheduleNextUpdate();
+                isFetching = false; // 解除鎖定
             }
         }
 
-        // 🛑 流量控制 3: 智慧排程系統
-        function scheduleNextUpdate() {
-            // 基礎延遲：60秒 ~ 70秒 (大幅降低頻率，節省配額)
-            let baseDelay = 60000 + Math.random() * 10000; 
-
-            // 如果連續發生錯誤 (代表伺服器快掛了)，我們就自動把時間拉長
-            // 錯誤 1 次 -> 等待時間加倍，讓伺服器喘息
-										
-																			
-            if (errorCount > 0) {
-                baseDelay = baseDelay * (errorCount + 1); 
-                console.log(`偵測到連線錯誤，下次更新將延後至 ${Math.floor(baseDelay/1000)} 秒後`);
-            }
-
-            // 清除舊的計時器 (避免重複執行)
-            if (updateTimer) clearTimeout(updateTimer);
-            
-            updateTimer = setTimeout(() => {
-                fetchData();
-            }, baseDelay);
+        // 手動更新按鈕觸發的函式
+        function manualRefresh() {
+            fetchData();
         }
 
-        // 進入休眠模式 (停止吃流量)
-        function goSleep() {
-            isSleeping = true;
-            if (updateTimer) clearTimeout(updateTimer);
-            
-            const statusBadge = document.getElementById('connectionStatus');
-            statusBadge.innerText = "💤 已暫停更新 (點擊這裡繼續)";
-            statusBadge.className = "status-badge status-sleep"; // 變灰色
-        }
-
-        // 喚醒功能 (使用者點擊按鈕，或是重新切換回分頁時觸發)
-        function wakeUp() {
-            activeTime = 0; // 重置計時
-            const statusBadge = document.getElementById('connectionStatus');
-            
-            if (isSleeping) {
-                isSleeping = false;
-                statusBadge.innerText = "🔄 重新連線中...";
-                statusBadge.className = "status-badge"; // 恢復亮燈
-                fetchData(); // 立刻抓一次
-            }
-        }
-
-        // 監聽頁面狀態：當使用者切換回來時，自動喚醒並更新
+        // 監聽頁面狀態：當使用者「切換回來」時，自動幫他更新一次 (貼心功能)
+        // 雖然是手動版，但這個功能不消耗背景流量，卻能提升體驗，建議保留
         document.addEventListener("visibilitychange", () => {
             if (!document.hidden) {
-                // 如果之前已經睡著了，或是只是單純切回來，都試著喚醒並更新
-                wakeUp(); 
-											
+                console.log("使用者回來了，自動更新一次數據！");
+                fetchData(); 
             }
         });
 
@@ -324,8 +264,7 @@
             initChart();           // 1. 畫出空圖表
             
             // ✨ 優化：在 0.5~1.5 秒之間隨機延遲後才發出「第一次」請求
-            // 這樣可以避免主持人一喊開始，大家同時按下連結造成瞬間塞車
-            // 同時保持「幾乎秒開」的良好體感
+            // 這是為了防止主持人喊開始時的瞬間爆量，之後就靠使用者手動更新了
             setTimeout(() => {
                 fetchData();
             }, 500 + Math.random() * 1000); 
