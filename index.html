@@ -5,13 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>[即時戰況]2025尾牙 極速變身- Dress Code Dressing Up Show</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Russo+One&family=Fugaz+One&display=swap" rel="stylesheet">
     
     <style>
-        /* 全局設定：深藍色背景，配合你的活動主視覺 */
+        /* =========================================
+           🎨 全局設定：極速橘黑主題 (Race Theme)
+           ========================================= */
         body {
             font-family: 'Noto Sans TC', sans-serif;
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); /* 深藍漸層 */
+            /* 背景：深沉的瀝青黑，帶有微微的速度光影放射效果 */
+            background: radial-gradient(circle at center, #2b2b2b 0%, #000000 100%);
             color: #ffffff;
             margin: 0;
             padding: 20px;
@@ -24,51 +27,91 @@
         .container {
             width: 100%;
             max-width: 900px;
-            background: rgba(255, 255, 255, 0.05); /* 半透明玻璃質感 */
+            /* 容器改為半透明黑色，提升質感 */
+            background: rgba(0, 0, 0, 0.6); 
             backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 20px;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 12px; /* 稍微銳利一點的圓角，比較有機械感 */
+            padding: 0;
+            /* 橘色光暈，營造能量感 */
+            box-shadow: 0 0 25px rgba(255, 69, 0, 0.2); 
+            border: 1px solid rgba(255, 69, 0, 0.3);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* 主視覺 Banner 設定 */
+        .kv-banner {
+            width: 100%;
+            height: auto;
+            max-height: 300px;
+            object-fit: cover;
+            /* 底部線條改為亮橘色，呼應主題 */
+            border-bottom: 3px solid #ff4500; 
+        }
+        
+        .content-padding {
+            padding: 25px;
+            width: 100%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         h1 {
             text-align: center;
-            color: #FFD700; /* 金黃色標題 */
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-            margin-bottom: 5px;
-            font-size: 1.8rem;
+            /* 使用 Fugaz One 字體，自帶斜體速度感 */
+            font-family: 'Fugaz One', 'Noto Sans TC', sans-serif; 
+            color: #ff8c00; /* 深橘色 */
+            /* 文字外發光效果，增加立體感 */
+            text-shadow: 2px 2px 0px #000, 0 0 15px rgba(255, 69, 0, 0.8);
+            margin: 10px 0;
+            font-size: 2rem;
+            letter-spacing: 1px;
+            font-style: italic; /* 強制斜體增加動感 */
+            text-transform: uppercase;
         }
 
         .subtitle {
             text-align: center;
-            color: #a8dce7;
-            font-size: 0.9rem;
-            margin-bottom: 30px;
+            color: #ffffff;
+            font-size: 0.95rem;
+            margin-bottom: 25px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .subtitle span {
+            color: #ff4500; /* 強調色 */
         }
 
-        /* 狀態燈號 */
+        /* 狀態按鈕 - 賽車儀表板風格 */
         .status-bar {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             cursor: pointer; /* 讓使用者知道可以點擊更新 */
             user-select: none; /* 防止點擊時選取文字 */
         }
         .status-badge {
             display: inline-block;
-            padding: 10px 25px; /* 加大一點，讓它更像按鈕 */
-            border-radius: 50px;
-            font-size: 0.95rem;
-            background-color: rgba(0, 255, 127, 0.2);
-            color: #00ff7f;
-            border: 1px solid #00ff7f;
+            /* ✨ 調整大小：稍微縮小內距與字體，回歸精緻感 */
+            padding: 8px 24px; 
+            border-radius: 4px; /* 方形圓角更有機械感 */
+            font-size: 0.9rem;
+            font-weight: bold;
+            /* 橘紅漸層按鈕背景 */
+            background: linear-gradient(135deg, #ff4500 0%, #ff8c00 100%);
+            color: #000000; /* 黑字對比最強 */
+            border: none;
+            box-shadow: 0 4px 15px rgba(255, 69, 0, 0.4);
             transition: all 0.2s;
-            box-shadow: 0 0 10px rgba(0, 255, 127, 0.1);
+            text-transform: uppercase;
+            font-style: italic;
         }
         .status-badge:hover {
-            transform: scale(1.05);
-            background-color: rgba(0, 255, 127, 0.3);
-            cursor: pointer;
+            transform: skewX(-10deg) scale(1.05); /* hover 時傾斜，像車子衝出去 */
+            box-shadow: 0 0 25px rgba(255, 69, 0, 0.7);
         }
         .status-badge:active {
             transform: scale(0.95); /* 點擊時縮小效果 */
@@ -77,7 +120,7 @@
         /* 圖表容器 RWD 設定 */
         .chart-container {
             position: relative;
-            height: 60vh; /* 手機上佔 60% 高度 */
+            height: 55vh; 
             width: 100%;
         }
 
@@ -85,29 +128,39 @@
         .footer {
             margin-top: 20px;
             font-size: 0.8rem;
-            color: #666;
+            color: #555;
             text-align: center;
+            font-family: 'Fugaz One', sans-serif;
+            opacity: 0.7;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>🏆 現場人氣投票戰況</h1>
-        <!-- 修改說明文字，引導使用者手動更新 -->
-        <div class="subtitle">⬇️ 點擊下方按鈕或重新整理頁面以更新數據 ⬇️</div>
+        <!-- 主視覺圖片 (請確保檔名為 kv.jpg) -->
+        <img src="kv.jpg" onerror="this.style.display='none'" class="kv-banner" alt="主視覺 Banner">
 
-        <!-- 點擊這個狀態列可以手動觸發更新 -->
-        <div class="status-bar" onclick="manualRefresh()">
-            <span id="connectionStatus" class="status-badge">連線中...</span>
-        </div>
-        
-        <div class="chart-container">
-            <canvas id="voteChart"></canvas>
+        <div class="content-padding">
+            <h1>🏆 現場人氣投票戰況</h1>
+            
+            <!-- 修改說明文字，引導使用者手動更新 -->
+            <div class="subtitle">
+                ⚡️ <span id="hint-text">點擊下方按鈕或重新整理頁面</span> 以更新數據 ⚡️
+            </div>
+
+            <!-- 手動更新按鈕 -->
+            <div class="status-bar" onclick="manualRefresh()">
+                <span id="connectionStatus" class="status-badge">READY TO START</span>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="voteChart"></canvas>
+            </div>
         </div>
     </div>
 
-    <div class="footer">Powered by IT Dept. vFinal-Manual</div>
+    <div class="footer">Powered by 福委會. vFinal-Orange-Speed</div>
 
     <script>
         // =========================================================
@@ -122,22 +175,23 @@
         function initChart() {
             const ctx = document.getElementById('voteChart').getContext('2d');
             
-            // 設定漸層顏色 (讓長條圖比較有質感)
+            // ✨ 視覺優化：橘紅色火焰漸層
             let gradient = ctx.createLinearGradient(0, 0, 0, 400);
-            gradient.addColorStop(0, 'rgba(54, 162, 235, 1)');   // 頂部淺藍
-            gradient.addColorStop(1, 'rgba(54, 162, 235, 0.2)'); // 底部透明
+            gradient.addColorStop(0, 'rgba(255, 69, 0, 0.9)');    // 頂部：火焰紅橘
+            gradient.addColorStop(0.5, 'rgba(255, 140, 0, 0.5)'); // 中段：亮橘
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)');       // 底部：透明
 
             myChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: [], // 等待 API 資料
+                    labels: [],
                     datasets: [{
                         label: '得票數',
                         data: [],
                         backgroundColor: gradient,
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1,
-                        borderRadius: 5,
+                        borderColor: '#ff4500', // 邊框：亮橘紅色
+                        borderWidth: 2,
+                        borderRadius: 2, // 稍微方一點，比較硬派
                         barPercentage: 0.6
                     }]
                 },
@@ -146,28 +200,38 @@
                     maintainAspectRatio: false,
                     layout: {
                         padding: {
-                            top: 30 // ⚠️ 關鍵：上方預留空間，避免數字被切掉
+                            top: 40 // ⚠️ 關鍵：上方預留空間，避免數字被切掉
                         }
                     },
                     plugins: {
-                        legend: { display: false }, // 隱藏圖例
-                        // 自定義數字標籤 (維持你原本要顯示數字的功能)
-                        customLabels: { display: true } 
+                        legend: { display: false }, 
+                        customLabels: { display: true },
+                        tooltip: {
+                            backgroundColor: 'rgba(20, 20, 20, 0.9)',
+                            titleColor: '#ff8c00',
+                            bodyColor: '#ffffff',
+                            bodyFont: { size: 14 },
+                            borderColor: '#ff4500',
+                            borderWidth: 1
+                        }
                     },
                     scales: {
                         y: {
                             beginAtZero: true,
                             grid: { color: 'rgba(255, 255, 255, 0.1)' },
                             ticks: { 
-                                color: '#ffffff', 
-                                font: { size: 14 }, 
+                                color: '#ff8c00', // y軸文字橘色
+                                font: { size: 12, family: "'Fugaz One', sans-serif" }, 
                                 stepSize: 1, 
                                 precision: 0 
                             } 
                         },
                         x: {
                             grid: { display: false },
-                            ticks: { color: '#ffffff', font: { size: 14, weight: 'bold' } }
+                            ticks: { 
+                                color: '#ffffff', 
+                                font: { size: 14, weight: 'bold' } 
+                            }
                         }
                     },
                     animation: {
@@ -181,21 +245,21 @@
                         const { ctx } = chart;
                         ctx.save();
                         
-                        // 設定文字樣式
-                        ctx.font = "bold 18px 'Noto Sans TC'"; // 字體大小
-                        ctx.fillStyle = '#FFD700'; // 金黃色 (配合標題)，或者用 #ffffff 白色
+                        // 數字樣式：白色大字 + 黑色陰影 (確保在橘色柱狀圖上也看得清楚)
+                        ctx.font = "bold italic 18px 'Noto Sans TC'"; // 賽車字體
+                        ctx.fillStyle = '#ffffff'; 
+                        //ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+                        //ctx.shadowBlur = 2;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'bottom';
 
-                        // 遍歷每一個長條
                         chart.data.datasets.forEach((dataset, i) => {
                             const meta = chart.getDatasetMeta(i);
                             meta.data.forEach((bar, index) => {
                                 const data = dataset.data[index];
-                                // 避免畫出 0 或者空值 (可選)
                                 if (data !== null && data !== undefined) {
-                                    // 在長條圖上方 5px 處畫上數字
-                                    ctx.fillText(data, bar.x, bar.y - 5);
+                                    // 在長條圖上方 8px 處畫上數字
+                                    ctx.fillText(data, bar.x, bar.y - 8);
                                 }
                             });
                         });
@@ -213,10 +277,10 @@
 
             const statusBadge = document.getElementById('connectionStatus');
             
-            // 點擊後立刻顯示載入中
-            statusBadge.innerText = "🔄 更新中...";
-            statusBadge.style.color = "#a8dce7";
-            statusBadge.style.borderColor = "#a8dce7";
+            // 點擊後顯示狀態 (模擬引擎啟動)
+            statusBadge.innerText = "🔥 BOOSTING...";
+            statusBadge.style.background = "linear-gradient(135deg, #ff8c00 0%, #ff4500 100%)";
+            statusBadge.style.color = "#000";
             
             try {
                 const response = await fetch(API_URL);
@@ -230,16 +294,18 @@
                 myChart.update();
 
                 const now = new Date();
-                statusBadge.innerText = "🟢 點此更新 (最後更新時間: " + now.toLocaleTimeString() + ")";
-                statusBadge.style.color = "#00ff7f";
-                statusBadge.style.borderColor = "#00ff7f";
+                // 目前使用簡潔的時間顯示
+                statusBadge.innerText = "REFRESHED ( Last Updated:" + now.toLocaleTimeString() + ")";
+                statusBadge.style.background = "#222"; // 變回深色底
+                statusBadge.style.color = "#ff8c00";   // 橘色字
+                statusBadge.style.border = "1px solid #ff8c00";
 
             } catch (error) {
                 console.error("Fetch error:", error);
                 
-                statusBadge.innerText = "⚠️ 更新失敗，點此重試";
-                statusBadge.style.color = "#ffeb3b";
-                statusBadge.style.borderColor = "#ffeb3b";
+                statusBadge.innerText = "⚠️ RETRY";
+                statusBadge.style.background = "#333";
+                statusBadge.style.color = "#ffff00";
             } finally {
                 isFetching = false; // 解除鎖定
             }
@@ -252,12 +318,13 @@
 
         // 監聽頁面狀態：當使用者「切換回來」時，自動幫他更新一次 (貼心功能)
         // 雖然是手動版，但這個功能不消耗背景流量，卻能提升體驗，建議保留
-        document.addEventListener("visibilitychange", () => {
-            if (!document.hidden) {
-                console.log("使用者回來了，自動更新一次數據！");
-                fetchData(); 
-            }
-        });
+        // 目前已註解掉，若需要可開啟
+        //document.addEventListener("visibilitychange", () => {
+        //    if (!document.hidden) {
+        //        console.log("使用者回來了，自動更新一次數據！");
+        //        fetchData(); 
+        //    }
+        //});
 
         // 程式進入點
         window.onload = function() {
